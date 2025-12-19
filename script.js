@@ -1,29 +1,37 @@
-// script.js (Armários Padrão)
+// script.js - Controle de Armários (Recepção Principal)
 document.addEventListener('DOMContentLoaded', async () => {
     const armariosGrid = document.getElementById('armarios-grid');
     
-    // 1. Carregar dados do Banco de Dados (SQLite) via API
-    // Transforma o array do banco em um objeto para fácil acesso
-    const dadosBanco = await window.api.getArmarios(); 
+    // 1. Carregar dados do Banco de Dados com tratamento de erro
+    const response = await window.api.getArmarios(); 
     const armarios = {};
-    dadosBanco.forEach(row => {
-        armarios[row.id] = row;
-    });
+    
+    if (response.success) {
+        response.data.forEach(row => {
+            armarios[row.id] = row;
+        });
+    } else {
+        console.error("Erro ao carregar armários:", response.error);
+        alert("Aviso: Não foi possível carregar os dados do banco.");
+    }
 
-    // 2. Criar Grade de Armários
+    // 2. Criar Grade de Armários (300 unidades)
+    const fragment = document.createDocumentFragment(); // Otimização de performance
     for (let i = 1; i <= 300; i++) {
         const armario = document.createElement('div');
         armario.classList.add('armario');
         armario.id = `armario-${i}`;
         
-        // HTML structure (mantido o seu)
+        const dados = armarios[i] || {};
+        const isEmprestado = dados.status === 'emprestado';
+
         armario.innerHTML = `
             <h3>Armário ${i}</h3>
             <div class="inputs">
-                <input type="text" id="nome-${i}" placeholder="Nome do Paciente" autocomplete="off">
-                <input type="text" id="prontuario-${i}" placeholder="Nº do Prontuário" autocomplete="off">
-                <input type="text" id="objetos-${i}" placeholder="Objetos no Armário" autocomplete="off">
-                <input type="text" id="recebido-${i}" placeholder="Devolvido a">
+                <input type="text" id="nome-${i}" placeholder="Nome do Paciente" autocomplete="off" value="${isEmprestado ? (dados.nome || '') : ''}">
+                <input type="text" id="prontuario-${i}" placeholder="Nº do Prontuário" autocomplete="off" value="${isEmprestado ? (dados.prontuario || '') : ''}">
+                <input type="text" id="objetos-${i}" placeholder="Objetos no Armário" autocomplete="off" value="${isEmprestado ? (dados.objetos || '') : ''}">
+                <input type="text" id="recebido-${i}" placeholder="Devolvido a" value="${isEmprestado ? (dados.recebido_por || '') : ''}">
             </div>
             <div class="botoes">
                 <button onclick="window.mudarStatus(${i}, 'emprestado')">🔄 Em Uso</button>
@@ -32,152 +40,120 @@ document.addEventListener('DOMContentLoaded', async () => {
             </div>
         `;
 
-        armariosGrid.appendChild(armario);
-
-        // Preencher dados se existirem no banco
-        if (armarios[i] && armarios[i].status === 'emprestado') {
-            document.getElementById(`nome-${i}`).value = armarios[i].nome || '';
-            document.getElementById(`prontuario-${i}`).value = armarios[i].prontuario || '';
-            document.getElementById(`objetos-${i}`).value = armarios[i].objetos || '';
-            document.getElementById(`recebido-${i}`).value = armarios[i].recebido_por || ''; // Note a mudança de chave
-            armario.classList.add('emprestado');
-        } else if (armarios[i] && armarios[i].status === 'devolvido-total') {
-            // Opcional: mostrar últimos dados ou manter limpo
-            armario.classList.add('devolvido-total');
-        }
+        if (isEmprestado) armario.classList.add('emprestado');
+        fragment.appendChild(armario);
     }
+    armariosGrid.appendChild(fragment);
 
-    // 3. Função Global para mudar status
+    // 3. Função Global para mudar status (Sincronizada com Database Robusto)
     window.mudarStatus = async (id, status) => {
-        const nome = document.getElementById(`nome-${id}`).value.trim();
-        const prontuario = document.getElementById(`prontuario-${id}`).value.trim();
-        const objetos = document.getElementById(`objetos-${id}`).value.trim();
-        const recebido = document.getElementById(`recebido-${id}`).value.trim();
-
-        // Validação básica
-        if (status === 'emprestado' && (!nome || !prontuario || !objetos)) {
-            alert('Preencha Nome, Prontuário e Objetos para emprestar.');
-            return;
-        }
-        if (status === 'devolvido-total' && !recebido) {
-            alert('Informe quem recebeu a devolução.');
-            return;
-        }
-
-        // Objeto de dados
-        const dadosArmario = {
+        const payload = {
             id: id,
-            nome,
-            prontuario,
-            objetos,
-            recebido: recebido, // map to 'recebido_por' no backend
-            status,
+            nome: document.getElementById(`nome-${id}`).value.trim(),
+            prontuario: document.getElementById(`prontuario-${id}`).value.trim(),
+            objetos: document.getElementById(`objetos-${id}`).value.trim(),
+            recebido: document.getElementById(`recebido-${id}`).value.trim(),
+            status: status,
             data: new Date().toISOString()
         };
 
-        try {
-            // Salva no SQLite
-            await window.api.saveArmario(dadosArmario);
-            
-            // Salva no Histórico SQLite
-            await window.api.addHistorico('padrao', id, status === 'emprestado' ? 'Empréstimo' : 'Devolução', dadosArmario);
+        // Validações
+        if (status === 'emprestado' && (!payload.nome || !payload.prontuario || !payload.objetos)) {
+            alert('Erro: Nome, Prontuário e Objetos são obrigatórios para empréstimo.');
+            return;
+        }
+        if (status === 'devolvido-total' && !payload.recebido) {
+            alert('Erro: Informe quem recebeu a devolução.');
+            return;
+        }
 
-            // Atualiza UI
-            const el = document.getElementById(`armario-${id}`);
-            el.className = 'armario ' + status; // Remove outras classes e add a nova
+        try {
+            // No banco robusto, saveArmario já trata o Histórico automaticamente por transação
+            const result = await window.api.saveArmario(payload);
             
-            if (status === 'devolvido-total') {
-                // Limpar campos visuais se devolvido? Normalmente sim.
-                document.getElementById(`nome-${id}`).value = '';
-                document.getElementById(`prontuario-${id}`).value = '';
-                document.getElementById(`objetos-${id}`).value = '';
-                document.getElementById(`recebido-${id}`).value = '';
+            if (result.success) {
+                const el = document.getElementById(`armario-${id}`);
+                el.className = 'armario ' + (status === 'emprestado' ? 'emprestado' : '');
+                
+                if (status === 'devolvido-total') {
+                    // Limpar campos visuais após devolução
+                    ['nome-', 'prontuario-', 'objetos-', 'recebido-'].forEach(p => {
+                        document.getElementById(p + id).value = '';
+                    });
+                    alert(`Armário ${id} liberado com sucesso!`);
+                } else {
+                    alert(`Armário ${id} registrado: Em Uso.`);
+                }
+            } else {
+                alert("Erro ao salvar: " + result.error);
             }
-            
         } catch (error) {
             console.error(error);
-            alert('Erro ao salvar no banco de dados.');
+            alert('Erro crítico na comunicação com o banco.');
         }
     };
 
-    // 4. Consulta de Histórico via SQLite
+    // 4. Consulta de Histórico
     window.consultarHistorico = async (id) => {
-        try {
-            const historico = await window.api.getHistorico('padrao', id);
-            
-            if (!historico || historico.length === 0) {
-                alert('Nenhum histórico encontrado.');
-                return;
-            }
-
-            const modal = document.getElementById('modal-historico');
-            const texto = document.getElementById('historico-texto');
-            
-            let conteudo = `Histórico Armário ${id}:\n\n`;
-            historico.forEach(h => {
-                const det = JSON.parse(h.detalhes);
-                const dataFormatada = new Date(h.data).toLocaleString('pt-BR');
-                conteudo += `[${dataFormatada}] - ${h.acao.toUpperCase()}\n`;
-                conteudo += `Nome: ${det.nome || '-'} | Pront: ${det.prontuario || '-'}\n`;
-                if(det.recebido) conteudo += `Recebido por: ${det.recebido}\n`;
-                conteudo += `--------------------------\n`;
-            });
-
-            texto.textContent = conteudo;
-            modal.style.display = 'block';
-
-        } catch (e) {
-            console.error(e);
-            alert('Erro ao buscar histórico.');
+        const response = await window.api.getHistorico('padrao', id);
+        
+        if (!response.success || response.data.length === 0) {
+            alert('Nenhum histórico encontrado para o armário ' + id);
+            return;
         }
+
+        const modal = document.getElementById('modal-historico');
+        const texto = document.getElementById('historico-texto');
+        
+        let conteudo = `HISTÓRICO - ARMÁRIO ${id}\n\n`;
+        response.data.forEach(h => {
+            const det = JSON.parse(h.detalhes);
+            const dataF = new Date(h.data).toLocaleString('pt-BR');
+            conteudo += `[${dataF}] ${h.acao.toUpperCase()}\n`;
+            conteudo += `Paciente: ${det.nome || '-'} | Pront: ${det.prontuario || '-'}\n`;
+            if(det.recebido) conteudo += `Responsável pela devolução: ${det.recebido}\n`;
+            conteudo += `--------------------------\n`;
+        });
+
+        texto.textContent = conteudo;
+        modal.style.display = 'block';
     };
-    
-    // Fechar modal (igual ao seu original)
+
+    // Fechar Modal
     document.querySelector('.close').onclick = () => document.getElementById('modal-historico').style.display = 'none';
-    window.onclick = (event) => {
-        if (event.target == document.getElementById('modal-historico')) {
-            document.getElementById('modal-historico').style.display = 'none';
+    window.onclick = (e) => { if (e.target.id === 'modal-historico') e.target.style.display = 'none'; };
+
+    // Filtro de Busca
+    window.filtrarArmarios = () => {
+        const filtro = document.getElementById('search').value.toLowerCase().trim();
+        for (let i = 1; i <= 300; i++) {
+            const nome = (document.getElementById(`nome-${i}`)?.value || '').toLowerCase();
+            const prontuario = (document.getElementById(`prontuario-${i}`)?.value || '').toLowerCase();
+            const div = document.getElementById(`armario-${i}`);
+            if (div) {
+                div.style.display = (filtro === '' || nome.includes(filtro) || prontuario.includes(filtro)) ? 'flex' : 'none';
+            }
         }
     };
 
-    // 1. Filtro de Busca
-window.filtrarArmarios = () => {
-    const filtro = document.getElementById('search').value.toLowerCase().trim();
-    for (let i = 1; i <= 300; i++) {
-        const nome = (document.getElementById(`nome-${i}`)?.value || '').toLowerCase();
-        const prontuario = (document.getElementById(`prontuario-${i}`)?.value || '').toLowerCase();
-        const div = document.getElementById(`armario-${i}`);
-        
-        if (div) {
-            // Se filtro vazio, mostra tudo. Se não, busca nome ou prontuário
-            div.style.display = (filtro === '' || nome.includes(filtro) || prontuario.includes(filtro)) ? 'flex' : 'none';
+    // Exportação Excel
+    window.exportarDados = () => {
+        const dados = [];
+        for (let i = 1; i <= 300; i++) {
+            const nome = document.getElementById(`nome-${i}`)?.value;
+            if (nome) {
+                dados.push({
+                    Armário: i,
+                    Nome: nome,
+                    Prontuário: document.getElementById(`prontuario-${i}`)?.value,
+                    Status: document.getElementById(`armario-${i}`).classList.contains('emprestado') ? 'Em Uso' : 'Liberado'
+                });
+            }
         }
-    }
-};
-
-// 2. Exportação (Recuperando dados da tela para o Excel)
-window.exportarDados = async () => {
-    const dados = [];
-    
-    // Varre os inputs da tela (que já estão sincronizados com o banco ao carregar)
-    for (let i = 1; i <= 300; i++) {
-        const nome = document.getElementById(`nome-${i}`)?.value;
-        const prontuario = document.getElementById(`prontuario-${i}`)?.value;
-        const status = document.getElementById(`armario-${i}`)?.classList.contains('emprestado') ? 'Em Uso' : 'Livre';
-        
-        if (nome || prontuario) {
-            dados.push({ Armário: i, Nome: nome, Prontuário: prontuario, Status: status });
-        }
-    }
-
-    if (dados.length === 0) return alert("Nada para exportar.");
-
-    // Usa a biblioteca XLSX já importada no HTML
-    const ws = XLSX.utils.json_to_sheet(dados);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Armários");
-    XLSX.writeFile(wb, "Controle_Armarios.xlsx");
-};
-
+        if (dados.length === 0) return alert("Não há dados para exportar.");
+        const ws = XLSX.utils.json_to_sheet(dados);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Recepção Principal");
+        XLSX.writeFile(wb, "Controle_Armarios_Principal.xlsx");
+    };
 });
-
