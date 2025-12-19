@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Controle de Armários - HRVJ</title>
+
+  <!-- Fontes modernas -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome para ícones -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+        onerror="console.warn('Font Awesome não carregado'); document.head.insertAdjacentHTML('beforeend', '<style>.icon{display:none}</style>')" >
+
+
+  <!-- Font Awesome para ícones -->
+  <link rel="stylesheet" href="styles.css">
+  <!--<link rel="stylesheet" href="tempo.css">-->
+  <link rel="stylesheet" href="valores.css">
+  <link rel="stylesheet" href="esquecidos.css">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+</head>
+
+<body>
+  <header class="cabecalho-centralizado">
+    <div class="header-content">
+      <img src="HRVJ.png" alt="Hospital Regional Vale do Jaguaribe" class="logo">
+      <h1 class="titulo-principal">Controle de Armários</h1>
+    </div>
+  </header>
+  
+  <div class="tabs">
+    <button class="tab-button active" data-tab="padrao">Recepção Principal</button>
+    <button class="tab-button" data-tab="urgencia">Urgência</button>
+    <!--<button class="tab-button" data-tab="tempo">Empréstimo com Tempo</button>-->
+    <button class="tab-button" data-tab="valores">Pertences de Valor</button>
+    <button class="tab-button" data-tab="esquecidos">Itens Esquecidos</button>
+  </div>
+
+  <div class="tab-content" id="padrao">
+    <div class="container">
+      <h2>Guarda-Volumes</h2>
+      <div class="search-container search-centralizado">
+        <input type="text" id="search" class="input-pequeno" placeholder="Pesquisar por Nome ou Prontuário" onkeyup="filtrarArmarios()">
+      </div>
+
+      <div id="armarios-grid"></div>
+
+      <div style="display: flex; justify-content: center; margin-top: 2rem;">
+        <button class="export-btn" onclick="exportarDados()"><i class="fas fa-file-csv"></i> Exportar CSV</button>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="tab-content" id="urgencia" style="display: none;">
+  <div class="container">
+    <h2>Recepção de Urgência</h2>
+    <div class="search-container search-centralizado">
+      <input type="text" id="search-urgencia" class="input-pequeno" placeholder="Pesquisar na Urgência..." onkeyup="filtrarArmariosUrgencia()">
+    </div>
+
+    <div id="urgencia-grid"></div> <div style="display: flex; justify-content: center; margin-top: 2rem;">
+      <button class="export-btn" onclick="exportarDados()"><i class="fas fa-file-csv"></i> Exportar Urgência</button>
+    </div>
+  </div>
+</div>
+
+  <!--<div class="tab-content" id="tempo" style="display: none;">
+    <div class="container">
+      <h2>Acolhimento</h2>
+      <div class="search-container search-centralizado">
+        <input type="text" id="search-tempo" class="input-pequeno" placeholder="Pesquisar por Nome ou Prontuário" onkeyup="filtrarArmariosTemporarios()">
+      </div>
+      
+      <div id="armarios-tempo" class="grade-armarios"></div>
+      <div style="display: flex; justify-content: center; margin-top: 1.5rem;">
+        <button class="export-btn" onclick="exportarTemporarios()">📤 Exportar CSV</button>
+      </div>
+      
+    </div>
+  </div>-->
+
+  <div class="tab-content" id="valores" style="display: none;">
+    <div class="container">
+      <h2>Guarda de Pertences de Valor</h2>
+      <div class="search-container search-centralizado">
+        <input type="text" id="search-valores" class="input-pequeno" placeholder="Pesquisar por Nome ou Prontuário" onkeyup="filtrarValores()">
+      </div>
+      <div id="armarios-valores" class="grade-armarios"></div>
+      <div style="display: flex; justify-content: center; margin-top: 1.5rem;">
+        <button class="export-btn" onclick="exportarValores()">📤 Exportar CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="esquecidos" style="display: none;">
+    <div class="container">
+      <h2>Itens Esquecidos</h2>
+      <div class="search-container search-centralizado">
+        <input type="text" id="search-esquecidos" class="input-pequeno" placeholder="Pesquisar por Nome ou Prontuário" onkeyup="filtrarEsquecidos()">
+      </div>
+      <div id="armarios-esquecidos" class="grade-armarios"></div>
+      <div style="display: flex; justify-content: center; margin-top: 1.5rem;">
+        <button class="export-btn" onclick="exportarEsquecidos()">📤 Exportar CSV</button>
+      </div>
+    </div>
+  </div>  
+
+  <!-- Modal de Histórico -->
+  <div id="modal-historico" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <div class="modal-body">
+        <pre id="historico-texto"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script src="tabs.js"></script>
+  <script src="script.js"></script>
+  <script src="urgencia.js"></script>
+  <!--<script src="script-temporizado.js"></script>-->
+  <script src="valores.js"></script>
+  <script src="esquecidos.js"></script>
+
+  <script>
+    window.addEventListener('load', function() {
+      if (typeof mudarStatus === 'undefined') {
+        console.error('Erro: script.js não carregou corretamente');
+      }
+      if (typeof carregarArmariosTemporizados === 'undefined') {
+        console.error('Erro: script-temporizado.js não carregou corretamente');
+      }
+
+    });
+  </script>
+
+</body>
+</html>
+
+<!-- Criador: Marcos da Silva Lima. email: marcos.silva.lima.com@gmail.com -->

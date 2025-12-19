@@ -1,0 +1,316 @@
+/* styles.css - visual profissional */
+
+:root {
+    --primary-color: #1e2a38;
+    --secondary-color: #3498db;
+    --success-color: #27ae60;
+    --warning-color: #f39c12;
+    --danger-color: #e74c3c;
+    --light-color: #f9f9f9;
+    --dark-color: #2c3e50;
+    --text-color: #333;
+    --border-color: #dfe6e9;
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --radius: 10px;
+  }
+  
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--light-color);
+    color: var(--text-color);
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+  }
+  
+  .cabecalho {
+    background-color: var(--primary-color);
+    color: #fff;
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: center;
+    box-shadow: var(--shadow);
+  }
+  
+  .logo {
+    height: 60px;
+    margin-right: 1.5rem;
+  }
+  
+  h1 {
+    font-size: 1.8rem;
+    font-weight: 600;
+  }
+  
+  .tabs {
+    display: flex;
+    justify-content: center;
+    border-bottom: 2px solid var(--border-color);
+    margin: 1rem auto;
+    background: #fff;
+  }
+  
+  .tab-button {
+    flex: 1;
+    padding: 1rem;
+    background: none;
+    border: none;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+  }
+  
+  .tab-button.active {
+    border-bottom: 3px solid var(--secondary-color);
+    color: var(--secondary-color);
+  }
+  
+  .container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    background-color: white;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+  }
+  
+  #search-container {
+    margin-bottom: 1.5rem;
+  }
+  
+  #search {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 1rem;
+  }
+  
+  #armarios-grid, #urgencia-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 1.5rem;
+  }
+  
+  .armario {
+    background: #fff;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1rem;
+    box-shadow: var(--shadow);
+    transition: transform 0.3s;
+  }
+  
+  .armario:hover {
+    transform: translateY(-3px);
+  }
+  
+  .armario h3 {
+    margin-bottom: 1rem;
+    color: var(--primary-color);
+    font-size: 1.1rem;
+  }
+
+  .armario.emprestado {
+    background-color: rgba(231, 76, 60, 0.1);
+    border-left: 4px solid var(--danger-color);
+  }
+
+ .armario.devolvido-total {
+    background-color: #eaffea;
+    border-left: 4px solid var(--success-color);
+  }
+  
+  
+  .inputs input {
+    width: 100%;
+    padding: 0.6rem;
+    margin-bottom: 0.6rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+  }
+
+  .inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    margin-bottom: 0.8rem;
+    align-items: center; /* centraliza os inputs */
+  }
+  
+  .botoes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.8rem;
+  }
+  
+  .botoes button {
+    flex: 1;
+    min-width: 100px;
+    padding: 0.6rem;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  button[onclick*="emprestado"] {
+    background-color: var(--danger-color);
+    color: white;
+  }
+  
+  button[onclick*="devolvido-total"] {
+    background-color: var(--success-color);
+    color: white;
+  }
+  
+  button[onclick*="consultarHistorico"] {
+    background-color: var(--secondary-color);
+    color: white;
+  }
+  
+  .export-btn {
+    background-color: var(--secondary-color);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background-color 0.3s ease;
+  }
+  
+  .export-btn:hover {
+    background-color: #2980b9;
+  }
+  
+  .modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(3px);
+  }
+  
+  .modal-content {
+    background: white;
+    margin: 5% auto;
+    padding: 2rem;
+    border-radius: var(--radius);
+    width: 90%;
+    max-width: 700px;
+    box-shadow: var(--shadow);
+  }
+  
+  .modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+    margin-top: 1rem;
+  }
+  
+  .close {
+    color: #aaa;
+    font-size: 1.5rem;
+    font-weight: bold;
+    float: right;
+    cursor: pointer;
+    transition: color 0.3s;
+  }
+  
+  .close:hover {
+    color: var(--text-color);
+  }
+  
+  #historico-texto {
+    font-family: 'Courier New', monospace;
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+    color: var(--text-color);
+  }
+  
+  @media (max-width: 768px) {
+    #armarios-grid {
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+  
+    .botoes button {
+      min-width: 100%;
+    }
+  
+    .tab-button {
+      font-size: 0.9rem;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .cabecalho {
+      flex-direction: column;
+      text-align: center;
+    }
+  
+    .logo {
+      margin-bottom: 1rem;
+    }
+  }
+  
+  header {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 1rem 2rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  .header-content {
+    display: flex;
+    align-items: center;
+    justify-content: center; /* centraliza no meio */
+    gap: 1.5rem;
+  }
+  
+  .logo {
+    height: 90px;
+    max-width: 100px;
+  }
+  
+  .titulo-principal {
+    font-size: 2rem;
+    font-weight: 600;
+    text-align: center;
+  }
+
+  .search-centralizado {
+    display: flex;
+    justify-content: center;
+    margin: 1rem 0;
+  }
+  
+  .input-pequeno {
+    width: 90%;
+    max-width: 1000px;
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    text-align: center;
+  }  
+
+
+/* Criador: Marcos da Silva Lima. email: marcos.silva.lima.com@gmail.com

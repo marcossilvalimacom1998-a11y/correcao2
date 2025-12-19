@@ -1,0 +1,37 @@
+{
+  "name": "armarios-recepcao",
+  "version": "1.0.0",
+  "description": "App de controle de armários - HRVJ",
+  "main": "main.js",
+  "author": "Marcos Da Silva Lima",
+  "email": "marcos.silva.lima.com@gmail.com",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "rebuild": "electron-rebuild -f -w better-sqlite3"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "electron-builder": "^24.13.3",
+    "electron-rebuild": "^3.2.9"
+  },
+  "build": {
+    "appId": "com.marcoslima.armarios",
+    "productName": "Controle Armários HRVJ",
+    "win": {
+      "target": "nsis",
+      "icon": "icon.ico"
+    },
+    "files": [
+      "**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    }
+  }
+}
