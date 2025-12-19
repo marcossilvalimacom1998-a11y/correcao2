@@ -1,26 +1,40 @@
+// esquecidos.js - Controle de Itens Esquecidos
 document.addEventListener('DOMContentLoaded', async () => {
   const container = document.getElementById('armarios-esquecidos');
   
-  // 1. Carregar dados do Banco de Dados (SQLite)
-  const dadosBanco = await window.api.getEsquecidos();
-  const esquecidos = {};
-  dadosBanco.forEach(item => {
-      esquecidos[item.id] = item;
-  });
+  // 1. Carregar dados do Banco com tratamento robusto
+  const response = await window.api.getEsquecidos();
+  const esquecidosCache = {};
+  
+  if (response.success) {
+      response.data.forEach(item => {
+          esquecidosCache[item.id] = item;
+      });
+  } else {
+      console.error("Erro ao carregar itens esquecidos:", response.error);
+      alert("Aviso: Não foi possível carregar a lista de itens esquecidos.");
+  }
 
-  function criarArmariosEsquecidos() {
+  // 2. Renderização Otimizada da Grade (40 armários para itens esquecidos)
+  function criarGradeEsquecidos() {
     container.innerHTML = '';
-    // Reduzi para 30 ou o número que preferir, para não pesar a tela
-    for (let i = 1; i <= 40; i++) { 
+    const fragment = document.createDocumentFragment();
+
+    for (let i = 1; i <= 40; i++) {
       const div = document.createElement('div');
       div.className = 'armario';
       div.id = `esquecido-${i}`;
 
+      const dados = esquecidosCache[i] || {};
+      const temItem = !!esquecidosCache[i];
+
       div.innerHTML = `
         <h3>Armário ${i}</h3>
-        <input type="text" id="nome-esquecido-${i}" placeholder="Nome do Paciente" autocomplete="off">
-        <input type="text" id="prontuario-esquecido-${i}" placeholder="Prontuário" autocomplete="off">
-        <input type="text" id="itens-esquecido-${i}" placeholder="Itens Guardados" autocomplete="off">
+        <div class="inputs">
+            <input type="text" id="nome-esquecido-${i}" placeholder="Nome do Paciente" autocomplete="off" value="${dados.nome || ''}">
+            <input type="text" id="prontuario-esquecido-${i}" placeholder="Prontuário" autocomplete="off" value="${dados.prontuario || ''}">
+            <input type="text" id="itens-esquecido-${i}" placeholder="Itens Guardados" autocomplete="off" value="${dados.itens || ''}">
+        </div>
         <div id="status-esquecido-${i}" class="status-info" style="margin: 5px 0; font-size: 0.9em; min-height: 20px;"></div>
         <div class="botoes">
           <button onclick="window.guardarEsquecido(${i})">📦 Guardar</button>
@@ -28,108 +42,104 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>
       `;
 
-      container.appendChild(div);
-
-      if (esquecidos[i]) {
-        document.getElementById(`nome-esquecido-${i}`).value = esquecidos[i].nome || '';
-        document.getElementById(`prontuario-esquecido-${i}`).value = esquecidos[i].prontuario || '';
-        document.getElementById(`itens-esquecido-${i}`).value = esquecidos[i].itens || '';
-        
-        // Lógica de Vencimento (30 dias)
-        // O banco retorna data_guardado como timestamp (inteiro)
-        const dataGuardado = parseInt(esquecidos[i].data_guardado); 
-        const trintaDiasMs = 30 * 24 * 60 * 60 * 1000;
-        const agora = Date.now();
-        const diff = agora - dataGuardado;
-        
-        const statusDiv = document.getElementById(`status-esquecido-${i}`);
-
-        if (diff > trintaDiasMs) {
-            div.classList.add('vencido');
-            div.classList.remove('guardado');
-            statusDiv.innerHTML = '<span style="color:red;font-weight:bold;">⚠️ PRAZO VENCIDO</span>';
-        } else {
-            div.classList.add('guardado');
-            div.classList.remove('vencido');
-            const diasRestantes = Math.ceil((trintaDiasMs - diff) / (1000 * 60 * 60 * 24));
-            statusDiv.innerHTML = `<span style="color:green;">Expira em ${diasRestantes} dias</span>`;
-        }
+      if (temItem) {
+        atualizarStatusVisual(div, i, dados.data_guardado);
       }
+
+      fragment.appendChild(div);
+    }
+    container.appendChild(fragment);
+  }
+
+  // Função auxiliar para calcular vencimento (30 dias)
+  function atualizarStatusVisual(elemento, id, timestamp) {
+    const statusDiv = elemento.querySelector(`#status-esquecido-${id}`);
+    const dataGuardado = parseInt(timestamp);
+    const trintaDiasMs = 30 * 24 * 60 * 60 * 1000;
+    const agora = Date.now();
+    const diff = agora - dataGuardado;
+
+    if (diff > trintaDiasMs) {
+        elemento.classList.add('vencido');
+        statusDiv.innerHTML = '<span style="color:red;font-weight:bold;">⚠️ PRAZO VENCIDO</span>';
+    } else {
+        elemento.classList.add('guardado');
+        const diasRestantes = Math.ceil((trintaDiasMs - diff) / (1000 * 60 * 60 * 24));
+        statusDiv.innerHTML = `<span style="color:green;">Expira em ${diasRestantes} dias</span>`;
     }
   }
 
+  // 3. Função para Guardar Item Esquecido
   window.guardarEsquecido = async (id) => {
-    const nome = document.getElementById(`nome-esquecido-${id}`).value.trim();
-    const prontuario = document.getElementById(`prontuario-esquecido-${id}`).value.trim();
-    const itens = document.getElementById(`itens-esquecido-${id}`).value.trim();
+    const payload = {
+      id,
+      nome: document.getElementById(`nome-esquecido-${id}`).value.trim(),
+      prontuario: document.getElementById(`prontuario-esquecido-${id}`).value.trim(),
+      itens: document.getElementById(`itens-esquecido-${id}`).value.trim(),
+      data: Date.now()
+    };
   
-    if (!nome || !prontuario || !itens) {
-      alert('Preencha todos os campos para guardar.');
+    if (!payload.nome || !payload.prontuario || !payload.itens) {
+      alert('Preencha todos os campos para guardar o item.');
       return;
     }
   
-    const dados = {
-      id,
-      nome,
-      prontuario,
-      itens,
-      data: Date.now() // Salva timestamp atual
-    };
-  
     try {
-        await window.api.saveEsquecido(dados);
-        esquecidos[id] = { ...dados, data_guardado: dados.data }; // Atualiza memória local
-        criarArmariosEsquecidos(); // Atualiza UI
-        alert('Item registrado com sucesso.');
+        const res = await window.api.saveEsquecido(payload);
+        if (res.success) {
+            esquecidosCache[id] = { ...payload, data_guardado: payload.data };
+            criarGradeEsquecidos(); // Re-renderiza para atualizar cores e cronómetro
+            alert(`Item no armário ${id} registado com sucesso.`);
+        } else {
+            alert("Erro ao guardar: " + res.error);
+        }
     } catch (err) {
         console.error(err);
-        alert('Erro ao salvar no banco.');
+        alert('Erro na comunicação com o banco de dados.');
     }
   };
 
+  // 4. Função para Descartar/Entregar Item
   window.descartarEsquecido = async (id) => {
-    if (confirm("Tem certeza que deseja descartar/entregar este item?")) {
-      try {
-          await window.api.deleteEsquecido(id);
-          delete esquecidos[id];
-          criarArmariosEsquecidos();
-          
-          // Limpa campos
-          document.getElementById(`nome-esquecido-${id}`).value = '';
-          document.getElementById(`prontuario-esquecido-${id}`).value = '';
-          document.getElementById(`itens-esquecido-${id}`).value = '';
-      } catch (err) {
-          console.error(err);
-          alert('Erro ao remover do banco.');
-      }
+    const item = esquecidosCache[id];
+    if (!item) {
+        alert("Este armário já está vazio.");
+        return;
     }
 
-    if (confirm("Tem certeza que deseja descartar/entregar este item?")) {
-  try {
-      // 1. Salvar no histórico ANTES de deletar
-      const item = esquecidos[id];
-      if (item) {
+    if (confirm(`Confirmar o descarte ou entrega dos itens do armário ${id}?`)) {
+      try {
+          // 1. Registar no histórico antes de eliminar
           await window.api.addHistorico('esquecido', id, 'Descarte/Entrega', { 
               nome: item.nome, 
               prontuario: item.prontuario,
               itens: item.itens
           });
-      }
 
-      // 2. Deletar
-      await window.api.deleteEsquecido(id);
-      delete esquecidos[id];
-      criarArmariosEsquecidos();
-      
-      // ... limpar campos ...
-  } catch (err) {
-      console.error(err);
-      alert('Erro ao remover do banco.');
-  }
-}
-    
+          // 2. Eliminar do banco
+          const res = await window.api.deleteEsquecido(id);
+          
+          if (res.success) {
+              delete esquecidosCache[id];
+              
+              // Limpar interface
+              const div = document.getElementById(`esquecido-${id}`);
+              div.classList.remove('guardado', 'vencido');
+              div.querySelector(`#status-esquecido-${id}`).innerHTML = '';
+              ['nome-esquecido-', 'prontuario-esquecido-', 'itens-esquecido-'].forEach(p => {
+                  document.getElementById(p + id).value = '';
+              });
+              
+              alert(`Armário ${id} limpo e histórico registado.`);
+          }
+      } catch (err) {
+          console.error(err);
+          alert('Erro ao processar o descarte.');
+      }
+    }
   };
 
+  // 5. Filtro de Busca
   window.filtrarEsquecidos = () => {
     const filtro = document.getElementById('search-esquecidos').value.toLowerCase().trim();
     for (let i = 1; i <= 40; i++) {
@@ -139,41 +149,36 @@ document.addEventListener('DOMContentLoaded', async () => {
         const nome = (document.getElementById(`nome-esquecido-${i}`)?.value || '').toLowerCase();
         const prontuario = (document.getElementById(`prontuario-esquecido-${i}`)?.value || '').toLowerCase();
         
-        if (filtro === '' || nome.includes(filtro) || prontuario.includes(filtro)) {
-            div.style.display = 'flex';
-        } else {
-            div.style.display = 'none';
-        }
+        div.style.display = (filtro === '' || nome.includes(filtro) || prontuario.includes(filtro)) ? 'flex' : 'none';
     }
   };
 
-  criarArmariosEsquecidos();
-
-window.exportarEsquecidos = () => {
-    const dados = [];
+  // 6. Exportação Excel
+  window.exportarEsquecidos = () => {
+    const dadosParaExportar = [];
     for (let i = 1; i <= 40; i++) {
-        const nome = document.getElementById(`nome-esquecido-${i}`)?.value;
-        if (nome) {
-            // Pega o status visual (vencido ou não)
+        const item = esquecidosCache[i];
+        if (item) {
             const statusDiv = document.getElementById(`status-esquecido-${i}`);
-            const statusTexto = statusDiv?.innerText || 'Ativo';
+            const situacao = statusDiv?.innerText || 'Ativo';
             
-            dados.push({
+            dadosParaExportar.push({
                 Armário: i,
-                Nome: nome,
-                Prontuário: document.getElementById(`prontuario-esquecido-${i}`)?.value,
-                Itens: document.getElementById(`itens-esquecido-${i}`)?.value,
-                Situação: statusTexto.includes('VENCIDO') ? 'VENCIDO' : 'No prazo'
+                Paciente: item.nome,
+                Prontuário: item.prontuario,
+                Itens: item.itens,
+                Situação: situacao.includes('VENCIDO') ? 'VENCIDO' : 'No prazo'
             });
         }
     }
-    if (dados.length === 0) return alert("Nada para exportar.");
-    const ws = XLSX.utils.json_to_sheet(dados);
+    
+    if (dadosParaExportar.length === 0) return alert("Não há itens esquecidos para exportar.");
+    
+    const ws = XLSX.utils.json_to_sheet(dadosParaExportar);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Esquecidos");
     XLSX.writeFile(wb, "Itens_Esquecidos.xlsx");
-};
-  
+  };
+
+  criarGradeEsquecidos();
 });
-
-
