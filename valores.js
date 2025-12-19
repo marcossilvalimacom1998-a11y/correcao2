@@ -1,147 +1,154 @@
+// valores.js - Controle de Pertences de Valor
 document.addEventListener('DOMContentLoaded', async () => {
   const container = document.getElementById('armarios-valores');
   
-  // Carregar do Banco de Dados
-  const dadosBanco = await window.api.getValores();
-  const armarios = {};
-  dadosBanco.forEach(item => {
-      // Filtra apenas os que estão guardados para exibir na grade ativa
-      if(item.status === 'guardado') armarios[item.id] = item;
-  });
+  // 1. Carregar dados do Banco com tratamento robusto
+  const response = await window.api.getValores();
+  const armariosAtivos = {};
+  
+  if (response.success) {
+      // Filtra apenas os que estão "guardados" para a visualização inicial
+      response.data.forEach(item => {
+          if (item.status === 'guardado') {
+              armariosAtivos[item.id] = item;
+          }
+      });
+  } else {
+      console.error("Erro ao carregar valores:", response.error);
+      alert("Não foi possível carregar os pertences de valor.");
+  }
 
-  function criarArmarios() {
+  // 2. Renderização Otimizada da Grade
+  function criarGradeValores() {
     container.innerHTML = '';
+    const fragment = document.createDocumentFragment();
+
     for (let i = 1; i <= 300; i++) {
       const div = document.createElement('div');
       div.className = 'armario';
       div.id = `valor-${i}`;
 
+      const dados = armariosAtivos[i] || {};
+      const isGuardado = !!armariosAtivos[i];
+
       div.innerHTML = `
         <h3>Armário ${i}</h3>
-        <input type="text" id="nome-valor-${i}" placeholder="Nome do Paciente" autocomplete="off">
-        <input type="text" id="prontuario-valor-${i}" placeholder="Prontuário" autocomplete="off">
-        <input type="text" id="itens-valor-${i}" placeholder="Itens Guardados" autocomplete="off">
-        <input type="text" id="devolver-valor-${i}" placeholder="Devolvido a">
+        <div class="inputs">
+            <input type="text" id="nome-valor-${i}" placeholder="Nome do Paciente" autocomplete="off" value="${dados.nome || ''}">
+            <input type="text" id="prontuario-valor-${i}" placeholder="Prontuário" autocomplete="off" value="${dados.prontuario || ''}">
+            <input type="text" id="itens-valor-${i}" placeholder="Itens Guardados" autocomplete="off" value="${dados.itens || ''}">
+            <input type="text" id="devolver-valor-${i}" placeholder="Devolvido a" value="${dados.devolver_para || ''}">
+        </div>
         <div class="botoes">
           <button onclick="window.guardarValor(${i})">📦 Guardar</button>
           <button onclick="window.devolverValor(${i})">✅ Devolvido</button>
           <button onclick="window.historicoValor(${i})">📜 Histórico</button>
         </div>
       `;
-      container.appendChild(div);
 
-      if (armarios[i]) {
-        document.getElementById(`nome-valor-${i}`).value = armarios[i].nome;
-        document.getElementById(`prontuario-valor-${i}`).value = armarios[i].prontuario;
-        document.getElementById(`itens-valor-${i}`).value = armarios[i].itens;
-        div.classList.add('guardado');
-      }
+      if (isGuardado) div.classList.add('guardado');
+      fragment.appendChild(div);
     }
+    container.appendChild(fragment);
   }
 
+  // 3. Função para Guardar Item
   window.guardarValor = async (id) => {
-    const nome = document.getElementById(`nome-valor-${id}`).value.trim();
-    const prontuario = document.getElementById(`prontuario-valor-${id}`).value.trim();
-    const itens = document.getElementById(`itens-valor-${id}`).value.trim();
+    const payload = {
+      id,
+      nome: document.getElementById(`nome-valor-${id}`).value.trim(),
+      prontuario: document.getElementById(`prontuario-valor-${id}`).value.trim(),
+      itens: document.getElementById(`itens-valor-${id}`).value.trim(),
+      data: Date.now(),
+      status: 'guardado'
+    };
     
-    if (!nome || !prontuario || !itens) {
-      alert('Preencha todos os campos.');
+    if (!payload.nome || !payload.prontuario || !payload.itens) {
+      alert('Preencha Nome, Prontuário e Itens para guardar.');
       return;
     }
 
-    const dados = { id, nome, prontuario, itens, data: Date.now() };
-    
     try {
-        await window.api.saveValor(dados);
-        // DESCOMENTADO: Agora salva o histórico corretamente
-        await window.api.addHistorico('valor', id, 'Guardou', dados);
-        
-        // Atualiza localmente
-        armarios[id] = dados;
-        document.getElementById(`valor-${id}`).classList.add('guardado');
-        alert('Item guardado com sucesso!');
+        const res = await window.api.saveValor(payload);
+        if (res.success) {
+            // No banco robusto, chamamos o histórico manualmente para Valores/Esquecidos
+            await window.api.addHistorico('valor', id, 'Guardou', payload);
+            
+            armariosAtivos[id] = payload;
+            document.getElementById(`valor-${id}`).classList.add('guardado');
+            alert(`Itens do armário ${id} guardados.`);
+        } else {
+            alert("Erro ao salvar: " + res.error);
+        }
     } catch (e) {
         console.error(e);
-        alert('Erro ao salvar.');
+        alert('Erro na comunicação com o sistema.');
     }
   };
 
+  // 4. Função para Devolver Item
   window.devolverValor = async (id) => {
     const devolverPara = document.getElementById(`devolver-valor-${id}`).value.trim();
+    
     if (!devolverPara) {
-      alert('Preencha "Devolvido a" antes de finalizar.');
+      alert('Informe quem está recebendo os itens.');
       return;
     }
 
-    const dados = { id, status: 'devolvido', devolver: devolverPara };
+    const dadosAtuais = armariosAtivos[id];
+    const payload = { id, status: 'devolvido', devolver: devolverPara };
     
     try {
-        await window.api.saveValor(dados);
-        // DESCOMENTADO: Registra quem recebeu a devolução
-        await window.api.addHistorico('valor', id, 'Devolveu', { ...armarios[id], devolvido_a: devolverPara });
-        
-        // Limpa UI
-        delete armarios[id];
-        criarArmarios();
-    } catch (e) {
-        console.error(e);
-        alert('Erro ao devolver.');
-    }
-  };
-
-  window.historicoValor = async (id) => {
-    try {
-        const historico = await window.api.getHistorico('valor', id);
-        
-        if (!historico || historico.length === 0) {
-            alert('Nenhum histórico encontrado.');
-            return;
-        }
-
-        const modal = document.getElementById('modal-historico');
-        const texto = document.getElementById('historico-texto');
-        
-        let conteudo = `Histórico de Valores - Armário ${id}:\n\n`;
-        historico.forEach(h => {
-            const det = JSON.parse(h.detalhes);
-            const dataFormatada = new Date(h.data).toLocaleString('pt-BR');
-            conteudo += `[${dataFormatada}] - ${h.acao.toUpperCase()}\n`;
-            conteudo += `Nome: ${det.nome || '-'} | Pront: ${det.prontuario || '-'}\n`;
-            conteudo += `Itens: ${det.itens || '-'}\n`;
-            if (det.devolvido_a) conteudo += `Devolvido a: ${det.devolvido_a}\n`;
-            conteudo += `--------------------------\n`;
-        });
-
-        texto.textContent = conteudo;
-        modal.style.display = 'block';
-    } catch (e) {
-        console.error(e);
-        alert('Erro ao buscar histórico.');
-    }
-  };
-
-  window.exportarValores = () => {
-    const dados = [];
-    for (let i = 1; i <= 300; i++) {
-        const nome = document.getElementById(`nome-valor-${i}`)?.value;
-        if (nome) {
-            dados.push({
-                Armário: i,
-                Nome: nome,
-                Prontuário: document.getElementById(`prontuario-valor-${i}`)?.value,
-                Itens: document.getElementById(`itens-valor-${i}`)?.value,
-                Status: 'Guardado'
+        const res = await window.api.saveValor(payload);
+        if (res.success) {
+            // Registra histórico com os detalhes do que estava guardado + quem recebeu
+            await window.api.addHistorico('valor', id, 'Devolveu', { 
+                ...dadosAtuais, 
+                devolvido_a: devolverPara 
             });
+            
+            delete armariosAtivos[id];
+            
+            // Limpa campos e UI
+            document.getElementById(`valor-${id}`).classList.remove('guardado');
+            ['nome-valor-', 'prontuario-valor-', 'itens-valor-', 'devolver-valor-'].forEach(p => {
+                document.getElementById(p + id).value = '';
+            });
+            alert(`Devolução do armário ${id} concluída.`);
         }
+    } catch (e) {
+        console.error(e);
+        alert('Erro ao processar devolução.');
     }
-    if (dados.length === 0) return alert("Nada para exportar.");
-    const ws = XLSX.utils.json_to_sheet(dados);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Valores");
-    XLSX.writeFile(wb, "Pertences_Valor.xlsx");
   };
 
-  // ADICIONADO: Função de filtro que faltava
+  // 5. Histórico de Valores
+  window.historicoValor = async (id) => {
+    const res = await window.api.getHistorico('valor', id);
+    
+    if (!res.success || res.data.length === 0) {
+        alert('Sem histórico para este armário.');
+        return;
+    }
+
+    const modal = document.getElementById('modal-historico');
+    const texto = document.getElementById('historico-texto');
+    
+    let conteudo = `HISTÓRICO DE VALORES - ARMÁRIO ${id}\n\n`;
+    res.data.forEach(h => {
+        const det = JSON.parse(h.detalhes);
+        const dataF = new Date(h.data).toLocaleString('pt-BR');
+        conteudo += `[${dataF}] ${h.acao.toUpperCase()}\n`;
+        conteudo += `Paciente: ${det.nome || '-'} | Itens: ${det.itens || '-'}\n`;
+        if (det.devolvido_a) conteudo += `Devolvido para: ${det.devolvido_a}\n`;
+        conteudo += `--------------------------\n`;
+    });
+
+    texto.textContent = conteudo;
+    modal.style.display = 'block';
+  };
+
+  // 6. Filtro de Busca
   window.filtrarValores = () => {
     const filtro = document.getElementById('search-valores').value.toLowerCase().trim();
     for (let i = 1; i <= 300; i++) {
@@ -151,13 +158,31 @@ document.addEventListener('DOMContentLoaded', async () => {
         const nome = (document.getElementById(`nome-valor-${i}`)?.value || '').toLowerCase();
         const prontuario = (document.getElementById(`prontuario-valor-${i}`)?.value || '').toLowerCase();
         
-        if (filtro === '' || nome.includes(filtro) || prontuario.includes(filtro)) {
-            div.style.display = 'flex';
-        } else {
-            div.style.display = 'none';
-        }
+        div.style.display = (filtro === '' || nome.includes(filtro) || prontuario.includes(filtro)) ? 'flex' : 'none';
     }
   };
 
-  criarArmarios();
+  // 7. Exportação
+  window.exportarValores = () => {
+    const dados = [];
+    for (let i = 1; i <= 300; i++) {
+        const nome = document.getElementById(`nome-valor-${i}`)?.value;
+        if (nome) {
+            dados.push({
+                Armário: i,
+                Paciente: nome,
+                Prontuário: document.getElementById(`prontuario-valor-${i}`)?.value,
+                Itens: document.getElementById(`itens-valor-${i}`)?.value,
+                Status: armariosAtivos[i] ? 'Guardado' : 'Entregue'
+            });
+        }
+    }
+    if (dados.length === 0) return alert("Não há dados de valores para exportar.");
+    const ws = XLSX.utils.json_to_sheet(dados);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Valores");
+    XLSX.writeFile(wb, "Controle_Valores.xlsx");
+  };
+
+  criarGradeValores();
 });
