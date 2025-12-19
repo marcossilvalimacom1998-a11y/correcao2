@@ -20,37 +20,30 @@ function createWindow () {
   win.loadFile('controle-armario.html');
 }
 
+// main.js - Trecho dos Handlers
 app.whenReady().then(() => {
-  // --- IPC Handlers (Comunicação Front <-> Back) ---
-  
   // Padrão
   ipcMain.handle('get-armarios', () => dbManager.getArmariosPadrao());
-  ipcMain.handle('save-armario', (event, data) => dbManager.saveArmarioPadrao(data.id, data));
-  
+  ipcMain.handle('save-armario', (event, data) => dbManager.saveArmario(data)); // Nome simplificado
+
   // Histórico
-  ipcMain.handle('add-historico', (event, {tipo, id, acao, detalhes}) => dbManager.registrarHistorico(tipo, id, acao, detalhes));
+  ipcMain.handle('add-historico', (event, {tipo, id, acao, detalhes}) => 
+    dbManager.registrarHistorico(tipo, id, acao, detalhes));
   ipcMain.handle('get-historico', (event, {tipo, id}) => dbManager.getHistorico(tipo, id));
 
-  // Temporizados
-  ipcMain.handle('get-temporizados', () => dbManager.getTemporizados());
-  ipcMain.handle('save-temporizado', (event, data) => dbManager.saveTemporizado(data));
-
-  // --- Valores ---
+  // Valores
   ipcMain.handle('get-valores', () => dbManager.getValores());
   ipcMain.handle('save-valor', (event, data) => dbManager.saveValor(data));
 
-  // --- Esquecidos ---
+  // Esquecidos
   ipcMain.handle('get-esquecidos', () => dbManager.getEsquecidos());
   ipcMain.handle('save-esquecido', (event, data) => dbManager.saveEsquecido(data));
   ipcMain.handle('delete-esquecido', (event, id) => dbManager.deleteEsquecido(id));
 
   createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
 });
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+
 });
